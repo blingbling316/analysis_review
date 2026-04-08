@@ -1,0 +1,14 @@
+*.csv
+*.jsonl
+*.npy
+*.pth
+*.pt
+*.pkl
+*.pickle
+*.pt
+*.pth
+*.pkl
+*.pickle
+*.npz
+*.pyc
+.vscode
