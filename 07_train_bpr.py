@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -161,9 +162,15 @@ class TrainConfig:
     batch_size: int = 2048
     epochs: int = 30
     lr: float = 1e-3
+    # 解冻 GNN 后，GNN 使用较小学习率（若未指定 lr_gnn，则为 lr * lr_gnn_ratio）
+    lr_gnn: Optional[float] = None
+    lr_gnn_ratio: float = 0.1
     hidden_dim: int = 256
     output_dim: int = 128
+    dropout: float = 0.2
     weight_decay: float = 1e-4
+    # 前若干 epoch 只训练 user embedding，GNN 前向用 no_grad + eval（关闭 dropout）
+    freeze_gnn_epochs: int = 5
     seed: int = 42
     log_every: int = 50
     log_file: str = "train.log"
@@ -318,22 +325,44 @@ def train(cfg: TrainConfig):
     # 3) 模型
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
-    gnn_model = InductiveGraphSAGE(node_features.shape[1], cfg.hidden_dim, cfg.output_dim).to(device)
+    gnn_model = InductiveGraphSAGE(
+        node_features.shape[1], cfg.hidden_dim, cfg.output_dim, dropout=cfg.dropout
+    ).to(device)
     rec_model = MultimodalRecommender(num_users, cfg.output_dim).to(device)
 
-    optimizer = optim.Adam(
-        list(gnn_model.parameters()) + list(rec_model.parameters()),
-        lr=cfg.lr,
-        weight_decay=cfg.weight_decay,
+    lr_gnn_eff = cfg.lr_gnn if cfg.lr_gnn is not None else (cfg.lr * cfg.lr_gnn_ratio)
+    opt_user_only = optim.Adam(rec_model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    opt_joint = optim.Adam(
+        [
+            {"params": gnn_model.parameters(), "lr": lr_gnn_eff, "weight_decay": cfg.weight_decay},
+            {"params": rec_model.parameters(), "lr": cfg.lr, "weight_decay": cfg.weight_decay},
+        ]
+    )
+    logger.info(
+        "优化策略: freeze_gnn_epochs=%d | 解冻后 lr_gnn=%.6f | lr_user=%.6f | dropout=%.3f",
+        cfg.freeze_gnn_epochs,
+        lr_gnn_eff,
+        cfg.lr,
+        cfg.dropout,
     )
 
     # 4) 训练
     for epoch in range(cfg.epochs):
-        gnn_model.train()
-        rec_model.train()
+        frozen = epoch < cfg.freeze_gnn_epochs
+        if frozen:
+            gnn_model.eval()
+            rec_model.train()
+            optimizer = opt_user_only
+        else:
+            if cfg.freeze_gnn_epochs > 0 and epoch == cfg.freeze_gnn_epochs:
+                logger.info(">>> 解冻 GNN：开始联合训练 user embedding + GraphSAGE")
+            gnn_model.train()
+            rec_model.train()
+            optimizer = opt_joint
 
         total_loss = 0.0
-        pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{cfg.epochs}")
+        phase = "freeze_user" if frozen else "joint"
+        pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{cfg.epochs} [{phase}]")
         for step, (users, pos_items, neg_items, ratings) in enumerate(pbar, start=1):
             users = users.to(device)
             pos_items = pos_items.to(device)
@@ -342,9 +371,13 @@ def train(cfg: TrainConfig):
 
             optimizer.zero_grad()
 
-            # 注意：all_item_embs 带梯度，不能在多个 batch 之间复用同一张计算图。
-            # 为了让 GNN 也能被训练，这里每个 batch 都重新计算一次全量 item embedding。
-            all_item_embs = gnn_model(node_features, edge_index)  # (N, dim)
+            if frozen:
+                # 只更新 user embedding：GNN 前向不建计算图、不更新参数
+                with torch.no_grad():
+                    all_item_embs = gnn_model(node_features, edge_index)
+            else:
+                all_item_embs = gnn_model(node_features, edge_index)
+
             pos_scores, neg_scores = rec_model(users, pos_items, neg_items, all_item_embs)
             loss = weighted_bpr_loss(pos_scores, neg_scores, ratings)
             loss.backward()
@@ -373,9 +406,10 @@ def train(cfg: TrainConfig):
         )
 
         logger.info(
-            "Epoch %d/%d | loss=%.6f | AUC=%.4f | HitRate@%d=%.4f | Precision@%d=%.6f | MRR=%.4f",
+            "Epoch %d/%d | phase=%s | loss=%.6f | AUC=%.4f | HitRate@%d=%.4f | Precision@%d=%.6f | MRR=%.4f",
             epoch + 1,
             cfg.epochs,
+            phase,
             avg_loss,
             metrics["auc"],
             cfg.eval_k,
@@ -407,9 +441,23 @@ def main():
     parser.add_argument("--out_user_map", default="user_id_map.csv")
     parser.add_argument("--batch_size", type=int, default=2048)
     parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=1e-3, help="用户 embedding 学习率（联合训练时）")
+    parser.add_argument(
+        "--lr_gnn",
+        type=float,
+        default=None,
+        help="GNN 学习率；默认不指定时使用 lr * lr_gnn_ratio",
+    )
+    parser.add_argument("--lr_gnn_ratio", type=float, default=0.1, help="未指定 lr_gnn 时，GNN lr = lr * ratio")
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--output_dim", type=int, default=128)
+    parser.add_argument("--dropout", type=float, default=0.2, help="GraphSAGE 第一层后的 dropout 概率")
+    parser.add_argument(
+        "--freeze_gnn_epochs",
+        type=int,
+        default=5,
+        help="前多少个 epoch 只训练 user embedding（GNN 冻结前向）",
+    )
     parser.add_argument("--weight_decay", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log_every", type=int, default=50)
@@ -429,8 +477,12 @@ def main():
         batch_size=args.batch_size,
         epochs=args.epochs,
         lr=args.lr,
+        lr_gnn=args.lr_gnn,
+        lr_gnn_ratio=args.lr_gnn_ratio,
         hidden_dim=args.hidden_dim,
         output_dim=args.output_dim,
+        dropout=args.dropout,
+        freeze_gnn_epochs=args.freeze_gnn_epochs,
         weight_decay=args.weight_decay,
         seed=args.seed,
         log_every=args.log_every,
