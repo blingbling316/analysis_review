@@ -12,7 +12,5 @@
 *.npz
 *.pyc
 .vscode
-*.log
 
-/Digital_Music
 run_with_free_gpu.sh

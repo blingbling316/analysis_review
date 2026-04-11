@@ -1,0 +1,204 @@
+================================================================================
+Cold-start Pipeline Diagnostic
+================================================================================
+
+[SECTION] Interactions
+[INFO] interactions.shape: (17273814, 4)
+[INFO] n_users: 1881488
+[INFO] n_items: 607313
+[INFO] item_id.min: 0
+[INFO] item_id.max: 607312
+[INFO] duplicate_rows: 252939
+[INFO] item_interaction_count: {'min': 1, 'p10': 2.0, 'p50': 7.0, 'p90': 46.0, 'max': 49022}
+[INFO] user_interaction_count: {'min': 1, 'p10': 5.0, 'p50': 7.0, 'p90': 16.0, 'max': 1001}
+
+[SECTION] Meta
+[INFO] meta_items: 607313
+
+[SECTION] Feature Matrix: raw_text_feat
+[INFO] raw_text_feat.shape: (607313, 384)
+[INFO] raw_text_feat.dtype: float32
+[INFO] raw_text_feat.nan_count: 0
+[INFO] raw_text_feat.inf_count: 0
+[INFO] raw_text_feat.zero_rows: 0/607313 (0.00%)
+[INFO] raw_text_feat.row_norms: {'min': 0.9999998211860657, 'p10': 0.9999999403953552, 'p50': 1.0, 'p90': 1.0, 'max': 1.0000001192092896}
+
+[SECTION] Feature Matrix: raw_image_feat
+[INFO] raw_image_feat.shape: (607313, 2048)
+[INFO] raw_image_feat.dtype: float32
+[INFO] raw_image_feat.nan_count: 0
+[INFO] raw_image_feat.inf_count: 0
+[INFO] raw_image_feat.zero_rows: 187/607313 (0.03%)
+[INFO] raw_image_feat.row_norms: {'min': 0.0, 'p10': 23.927961349487305, 'p50': 28.87714195251465, 'p90': 33.58281707763672, 'max': 64.09188079833984}
+[WARN] raw_image_feat 有全零行；如果这是图像特征，通常意味着无图或下载失败。
+
+[SECTION] Feature Matrix: aligned_text_feat
+[WARN] 文件不存在，跳过。
+
+[SECTION] Feature Matrix: aligned_image_feat
+[INFO] aligned_image_feat.shape: (607313, 256)
+[INFO] aligned_image_feat.dtype: float32
+[INFO] aligned_image_feat.nan_count: 0
+[INFO] aligned_image_feat.inf_count: 0
+[INFO] aligned_image_feat.zero_rows: 0/607313 (0.00%)
+[INFO] aligned_image_feat.row_norms: {'min': 0.9999998211860657, 'p10': 0.9999999403953552, 'p50': 1.0, 'p90': 1.0, 'max': 1.0000001192092896}
+
+[SECTION] Alignment Sanity
+[OK] raw_text_feat 行数覆盖交互中的 item_id 范围。
+[OK] raw_image_feat 行数覆盖交互中的 item_id 范围。
+[OK] aligned_image_feat 行数覆盖交互中的 item_id 范围。
+[OK] raw_text_feat 与 raw_image_feat 行数一致: 607313
+[OK] raw_text_feat 与 aligned_image_feat 行数一致: 607313
+[OK] raw_image_feat 与 aligned_image_feat 行数一致: 607313
+
+[SECTION] Rule-based Summary
+
+[SECTION] KNN Graph
+[INFO] knn_neighbors.shape: (607313, 20)
+[INFO] knn_neighbors.invalid_entries: 0
+[INFO] knn_neighbors.self_hits: 6038
+[WARN] 邻居矩阵仍含自身节点；如果你预期已经去掉自身，这里需要复查。
+[INFO] knn_scores.shape: (607313, 20)
+[INFO] knn_scores.stats: {'min': 0.3743232190608978, 'p10': 0.6399960517883301, 'p50': 0.7742815017700195, 'p90': 0.8780925273895264, 'max': 1.0000004768371582, 'mean': 0.7667893767356873}
+[INFO] knn_scores.<0.1_ratio: 0.00%
+[INFO] edge_count: 12146260
+[INFO] edge_invalid_entries: 0
+[INFO] edge_self_loops: 6038
+[WARN] 边列表里存在 self-loop。
+[INFO] edge_weight.stats: {'min': 0.3743232190608978, 'p10': 0.6399960517883301, 'p50': 0.7742815017700195, 'p90': 0.8780925273895264, 'max': 1.0000004768371582, 'mean': 0.7667893767356873}
+[INFO] edge_reciprocal_ratio(sampled): 42.10%
+
+[SECTION] Val Split Fallback Check (mirrors current 07 logic)
+[INFO] split.train_users: 1505190
+[INFO] split.val_users: 376298
+[INFO] split.valid_val_users: 376298
+[INFO] split.global_mean_fallback_users: 376298/376298 (100.00%)
+[WARN] 按当前 07 的评估逻辑，这些验证用户会退化成 global_mean 用户向量。
+[FAIL] 超过一半验证用户会退化成 global_mean；当前评估结果参考价值很弱。
+[INFO] split.train_items: 595643
+[INFO] split.val_items: 436105
+[INFO] split.val_items_not_in_train: 11670/436105 (2.68%)
+
+[SECTION] Sampled item_ids for neighbor preview
+[INFO] sample_item_ids: [9377, 32686, 360103, 414399, 552100]
+
+[SECTION] Raw Text Neighbors
+
+[raw_text_feat] item_id=9377 title=StarTech.com USB C to HDMI 2.0 Adapter with Power Delivery - 4K 60Hz USB Type-C to HDMI Display Video Converter - 60W PD Pass-Through Charging Port - Thunderbolt 3 Compatible - Black (CDP2HDUCP)
+  top1: item_id=69872 score=0.9124 title=StarTech.com USB C to HDMI Adapter - Black - 4K 30Hz - Thunderbolt 3 Compatible - USB Type C to HDMI Display and Video Adapter (ADCIIHAM)
+  top2: item_id=37225 score=0.8727 title=StarTech.com USB C to 4 HDMI Adapter - External Video & Graphics Card - USB Type-C to Quad HDMI Display Adapter Dongle - 1080p 60Hz - Multi Monitor Video Converter - Windows Only (USBC2HD4)
+  top3: item_id=607039 score=0.8716 title=StarTech.com 6ft (2m) USB C to HDMI Cable - 4K 60Hz USB Type C to HDMI 2.0 Video Adapter Cable - Thunderbolt 3 Compatible - Laptop to HDMI Monitor/Display - DP 1.2 Alt Mode HBR2 - Black (CDP2HD2MBNL)
+  top4: item_id=2856 score=0.8518 title=StarTech.com USB C to DisplayPort Adapter, 8K/4K 60Hz USB-C to DisplayPort 1.4 Dongle, USB Type-C to DP Monitor Video Converter, Works w/TB3 - 12" Attached Cable, Upgraded Version of CDP2DP (CDP2DPEC)
+  top5: item_id=109343 score=0.8454 title=StarTech.com USB-C to Dual HDMI Adapter, USB Type-C Multi-Monitor MST Hub, Dual 4K 30Hz/1080p 60Hz HDMI Laptop Display Extender / Splitter, Extra-Long Built-In Cable, Windows Only (MSTCDP122HD)
+
+[raw_text_feat] item_id=32686 title=20V 3.25A 65W Adapter for Lenovo Thinkpad T400 T410 T420 T420S T430 T430s T430u T500 T510 T520 X120e X130e X131e X140e X200 X201 X220 X220T X230 E520 E530 E535 SL500 SL510 T430u T520 Laptop Charger
+  top1: item_id=505995 score=0.9301 title=20V 4.5A 90W 40Y7659 AC Adapter Charger for Lenovo Thinkpad T60 T61 T400 T410 T420 T430 T500 T510 T520 T530 X60 Z60 X200 X201 X220 X230 X61 L420 L430 Edge 14 15 E420 E430 E530 92P1109 92P1156
+  top2: item_id=19560 score=0.9146 title=20V 3.25A 65W AC Adapter Laptop Charger Compatible for Lenovo Thinkpad T470 T470S T460 T460S T440 T440S T430 T540P T560 T450 E450 E460 E540 E550 E560 E570 G50 Z50 Z70;Ideapad U430 Power Supply Cord
+  top3: item_id=258084 score=0.9093 title=90W 20V 4.5A AC Adapter Charger Compatible with Lenovo Thinkpad T60 T61 T400 T410 T420 T430 T500 T510 T520 T530 X60 Z60 X200 X201 X220 X230 X61 L420 L430 Edge 14 15 E420 E430 E530 Power Supply
+  top4: item_id=469442 score=0.9082 title=Lenovo 65W 20V 3.25A Laptop Charger AC/DC Power Adapter for Thinkpad T410 2522 2537; T420 4180 4236; Edge 14 0578, 15 0319; SL510 2847; X120E 0596; X200 7458; X201 3626; X220 4290 4291
+  top5: item_id=344614 score=0.9056 title=65W 20V 3.25A AC Adapter charger for Lenovo ThinkPad Edge E40 E420 E430 E520 E525 E530 E535 E545 B490 B590; Lenovo X60 X60s X120e X140e X200 X201 X220 X230 X230t X300 X301 Power Cord
+
+[raw_text_feat] item_id=360103 title=LITTLE TREE Bamboo 2-Tier Monitor Stand Riser with 3 Drawers Laptop TV Printer Stand with Multipurpose Compartments
+  top1: item_id=423018 score=0.9067 title=2 Tier Monitor Stand Bamboo Computer Riser PC Notebook Printed Laptop Stand Desk Organizers with Draweres
+  top2: item_id=213983 score=0.9030 title=Monitor Stand Riser Desk Organizer-Bamboo 2 Tier Laptop Stand with Drawers, Adjustable Desktop Storage Organizer for TV,Computer, Printer, Cellphone-Use in Office,Home/Reduce Neck &Eye Strain(Basic)
+  top3: item_id=347300 score=0.8977 title=EasyPAG Bamboo Monitor Printer Stand Computer Riser with Storage 2 Tier Desk Organizer for Home/Office
+  top4: item_id=249206 score=0.8949 title=Monitor Stand Riser Desk Organizer-Bamboo 2 Tier Laptop Stand with Drawers, Adjustable Desktop Storage Organizer for Computer, Printer, Cellphone-Use in Office,Home/Reduce Neck &Eye Strain(Natural)
+  top5: item_id=79157 score=0.8916 title=Maydear Bamboo Monitor Stand Riser with 4 Storage Drawer, 2 Tier Desk Organizer Stand for Laptop Computer, Desktop Printer Stand, Versatile as Storage Shelf & Screen Holder
+
+[raw_text_feat] item_id=414399 title=Mini Record Player with Aluminum Base, Phonograph Bluetooth Speaker, Aux-in, USB Port for Flash Drive, Vintage Gramophone Turntable for Home Decoration (Without Record Player)
+  top1: item_id=378124 score=0.8886 title=Mini Turntable, Cute Record Player, Bluetooth Gramophone with Horn Speaker for 33/45 RPM Vinyl Records, Wirlesss Playback Turntable (Brown)
+  top2: item_id=401103 score=0.8833 title=Record Player with Built-in 2 Speakers, Vintage Portable Bluetooth Suitcase Vinyl Player 3 Speed Turntable Support USB MP3 Recording, Digital Playback and RCA/AUX/Headphone Jack, Blue
+  top3: item_id=175300 score=0.8818 title=Record Player, Popsky Vintage Turntable 3-Speed Bluetooth Record Player with Speaker, Portable LP Vinyl Player, RCA Jack, Natural Wood
+  top4: item_id=561195 score=0.8815 title=Record Player with Built-in Speakers, USB Audio Recording, Vintage Bluetooth Portable Suitcase 33 45 78 RPM Vinyl Turntable Support RCA Out AUX-in Headphone Jack, Purple
+  top5: item_id=243116 score=0.8812 title=Vintage Turntable, Bluetooth Record Player, Built-in Dual Stereo Speakers, 3-Speed Belt-Drive Turntable, Record Player with Wireless Playback & Auto-Stop,Light Wood
+
+[raw_text_feat] item_id=552100 title=HP Spectre 13-4193dx with Intel i7-6500U 3.1 GHz, 13.3" LED-backlit touch screen (2560 x 1440) 8 GB DDR3L SDRAM (1 x 8 GB) 256 GB SSD Intel 802.11ac (2x2) and Bluetooth 4.0 Combo Windows 10 Home 64
+  top1: item_id=177520 score=0.8491 title=HP Spectre Pro x360 G2 Convertible Touchscreen 13.3in QHD (2560X1440), i7-6600U, 8GB LPDDR3-1600, 512GB SSD, Bluetooth, WiFi, Webcam, Backlit Keyboard, Win 10 Pro (Renewed)
+  top2: item_id=285249 score=0.8471 title=HP Spectre x360 13-ap0013dx Convertible 13.3inch Full HD Touchscreen Notebook Computer, Intel Core i7-8565U 1.8GHz, 8GB RAM, 256GB SSD, Windows 10 Home, Ash Silver - by HP(Renewed)
+  top3: item_id=499409 score=0.8413 title=HP Spectre x360 2-in-1 Touchscreen Laptop, 4K UHD 15.6", Core i7-10510U, GeForce MX330 2GB Graphics, 16GB RAM, Backlit, Thunderbolt 3, 1TB NVMe PCIe SSD, Mytrix Wireless Mouse, Win 10 (Renewed)
+  top4: item_id=215467 score=0.8391 title=HP Spectre x360 Luxury 14T,13.5" 3:2 WUXGA Touch,Intel i7-1165G7, 16GB RAM, 512GB SSD, Bang&Olufsen Quad Speakers, Fingerprint, Tilt Pen, Nightfall Black, Win 10 Pro, 64GB TechWarehouse Flash Drive
+  top5: item_id=221770 score=0.8377 title=HP Spectre x360 15-AP012 15.6-Inch Ultra HD IPS 2-in-1 Touchscreen Notebook Computer, i7-6500U 2.5GHz, 16GB, 256GB SSD, W10 Home (Renewed)
+
+[SECTION] Raw Image Neighbors
+
+[raw_image_feat] item_id=9377 title=StarTech.com USB C to HDMI 2.0 Adapter with Power Delivery - 4K 60Hz USB Type-C to HDMI Display Video Converter - 60W PD Pass-Through Charging Port - Thunderbolt 3 Compatible - Black (CDP2HDUCP)
+  top1: item_id=62439 score=0.9393 title=StarTech.com USB 3.0 to Dual Port Gigabit Ethernet Adapter w/USB Port - 10/100/100 - USB Gigabit LAN Network NIC Adapter (USB32000SPT)
+  top2: item_id=190935 score=0.9324 title=StarTech.com HDMI to VGA Adapter – 1920x1080 – HDMI Converter with Audio Output – VGA to HDMI Monitor Adapter (HD2VGAA2),Black
+  top3: item_id=60558 score=0.9287 title=Ableconn USB3E1002 SuperSpeed USB 3.0 to RJ45 Gigabit Ethernet LAN Network Adapter for Windows, Mac OS X, ChromeOS, and Linux [ASIX AX88179 chipset] - USB Ethernet Network - USB to RJ45 (Black)
+  top4: item_id=351865 score=0.9271 title=Mini DisplayPort(Thunderbolt) to HDMI/VGA/DVI 3 in 1 Adapter, Koopman Mini DP Cable Connector for Apple MacBook Air/Pro iMac Surface Book Microsoft Surface Pro and More - Black
+  top5: item_id=461968 score=0.9261 title=CableCreation USB-C to HDMI Adapter with 65W PD, USB Type C Male to HDMI Female Converter 4K/60Hz Support Charging, Compatible with Dex, S20, S10, Note 10, MacBook Pro and More
+
+[raw_image_feat] item_id=32686 title=20V 3.25A 65W Adapter for Lenovo Thinkpad T400 T410 T420 T420S T430 T430s T430u T500 T510 T520 X120e X130e X131e X140e X200 X201 X220 X220T X230 E520 E530 E535 SL500 SL510 T430u T520 Laptop Charger
+  top1: item_id=254763 score=0.9685 title=Ac Adapter ThinkPad Charger for Lenovo ThinkPad L440 L450 L460 L470 G500 G500s G505s G510 T431s T440 T440p T440s fits P/N 0B46994 ADLX65NCC3A 0A36258 45N0236 45N0237
+  top2: item_id=424634 score=0.9602 title=ROLADA 65W 20V 3.25A Power Supply for Lenovo Thinkpad X230 E545 T530 T420 T420s T500 T520 X140e; B590 L430 R400 R500 R61 R61i SL500 SL510 T430u; Edge 15 E430 E520 E530 E535 Laptop Charger Power Cord
+  top3: item_id=519858 score=0.9597 title=ADLX45NLC3A ADLX45NDC3A AC Power Charger Compatible for Le-novo ADLX45NCC2A ADLX45NLC2A 36200245 45N0289 36200246 45N0290 0B47030 45N0294 0C19880 20V 2.25A 45W
+  top4: item_id=358532 score=0.9597 title=20V 3.25A 65W AC Charger Adapter Compatible with IdeaPad Yoga 2 11 11s 13 2 Pro Thinkpad T440 T450 T460 T560 E440 E450 E550 E560 ADLX65NDT3A ADLX65NDC3 ADLX65SLC2A USB Pin Power Supply Cord
+  top5: item_id=585286 score=0.9596 title=Ursulan 65W Replacement Laptop Charger for Toshiba Satellite C55 C55D C55T C55-A C655 C70 C855D-S5232 L655 L755 L875D-S7332 L30 A665, PA3917U-1ACA PA3467U-1ACA PA3097U-1ACA 19V 3.42A AC Adapter
+
+[raw_image_feat] item_id=360103 title=LITTLE TREE Bamboo 2-Tier Monitor Stand Riser with 3 Drawers Laptop TV Printer Stand with Multipurpose Compartments
+  top1: item_id=19785 score=0.9026 title=Tribesigns Monitor Stand Riser with Storage Organizer Drawers Bamboo, Natural Brown
+  top2: item_id=256431 score=0.9007 title=SONGMICS Bamboo Monitor Stand Desktop Riser Desk Organizer with Storage Slots for Computer Laptop TV Natural ULLD211N
+  top3: item_id=315767 score=0.8964 title=Uniture Wood Monitor Stand - 2 Shelf 2p - Multi Purpose Stand Made of Natural Pine, Robust Construction, Home and Office Desktop Stand, Desk Organizer With Storage Space, Complete No Assembly Required
+  top4: item_id=187782 score=0.8956 title=Ybj-ake Monitor Stand Riser with Drawers, Desktop ,Laptop Stand Riser with Keyboard Storage Space for Home & Office Use
+  top5: item_id=453522 score=0.8920 title=Monitor Stand,Monitor Stand Riser with Windows Hello Fingerprint ID,Wireless Charging,Dual Band WiFi&Hot spot Sharing,Type-C/A 3.2 HUB,BT Dynamic Lock，Docking Station Stand for Windows Desktop PC
+
+[raw_image_feat] item_id=414399 title=Mini Record Player with Aluminum Base, Phonograph Bluetooth Speaker, Aux-in, USB Port for Flash Drive, Vintage Gramophone Turntable for Home Decoration (Without Record Player)
+  top1: item_id=180794 score=0.9134 title=Mini Vintage Retro Classic Gramophone Phonograph Shape Stereo Speaker Sound System Music Box 3.5mm Audio Blue Tooth 4.2 Aux-in/USB Flash Drive Size: (8.19'' x 6.73'' x 13.11'')
+  top2: item_id=560003 score=0.9013 title=Asommet Gramophone Record Player Retro Turntable All in One Vintage Phonograph Nostalgic for LP with Copper Horn, Built-in Speaker 3.5mm Aux-in/USB/FM Radio Size:13.5in
+  top3: item_id=600477 score=0.9008 title=Wooden Phonograph Gramophone Turntable Vinyl Record Player Speakers Stereo System Control 33/45 RPM FM AUX USB Ouput Bluetooth 4.2
+  top4: item_id=566733 score=0.8976 title=KITBIT Phonograph Turntable Wireless Speaker, with Aux-in, FM Radio, USB Port for Flash Drive, Wooden Gramophone Vintage Retro Style (Wood with CD Player)
+  top5: item_id=548901 score=0.8947 title=Wooden Phonograph Gramophone Turntable Vinyl Record Player Speakers Stereo System Control 33/45 RPM CD FM AUX USB Ouput Bluetooth 4.2
+
+[raw_image_feat] item_id=552100 title=HP Spectre 13-4193dx with Intel i7-6500U 3.1 GHz, 13.3" LED-backlit touch screen (2560 x 1440) 8 GB DDR3L SDRAM (1 x 8 GB) 256 GB SSD Intel 802.11ac (2x2) and Bluetooth 4.0 Combo Windows 10 Home 64
+  top1: item_id=89769 score=1.0000 title=HP Spectre X360 13-4193DX 2-in-1 13.3in QHD Touch Screen Laptop Intel Core i7-6500U 256GB SSD 8GB DDR3L Windows 10 - Black/Gold (Renewed)
+  top2: item_id=47683 score=0.9848 title=HP Spectre x360 - 13t Copper Trim(6th Gen. Intel i7-6500U, QHD 2560x1440, 256GB SSD, 8GB RAM, Windows 10, AC Wifi, Bluetooth, Backlit Keyboard) Ash Silver 2-in-1 13.3" Ultrabook Tablet laptop PC
+  top3: item_id=591397 score=0.9805 title=HP Spectre x360 13-4197ms 2-in-1 13.3in QHD IPS Touch Screen Laptop - Core i7-6500U 8GB Memory 256GB Solid State Drive (Renewed)
+  top4: item_id=365314 score=0.9468 title=Asus Q304UA-BBI5T10 2-in-1 - 13.3" FHD Touch - i5-6200U up to 2.8Ghz - 6GB - 1TB
+  top5: item_id=287530 score=0.9423 title=2016 Model Dell Inspiron Premium High Performance 11.6" 2-in-1 Touch-Screen Laptop PC, Intel Pentium, 4GB RAM, 128GB SSD, HDMI, WIFI, Bluetooth, MaxxAudio, Windows 10
+
+[SECTION] Aligned Image Neighbors
+
+[aligned_image_feat] item_id=9377 title=StarTech.com USB C to HDMI 2.0 Adapter with Power Delivery - 4K 60Hz USB Type-C to HDMI Display Video Converter - 60W PD Pass-Through Charging Port - Thunderbolt 3 Compatible - Black (CDP2HDUCP)
+  top1: item_id=413837 score=0.8390 title=CableCreation Thunderbolt 3 to Dual HDMI Display, Thunderbolt 3 to Two HDMI Adapter, 4K@60Hz, 40Gbps, USB C to HDMI Cable Compatible with Mac and Some Windows Systems
+  top2: item_id=190935 score=0.8241 title=StarTech.com HDMI to VGA Adapter – 1920x1080 – HDMI Converter with Audio Output – VGA to HDMI Monitor Adapter (HD2VGAA2),Black
+  top3: item_id=215769 score=0.8217 title=Accell DP to HDMI Adapter - DisplayPort 1.2 to HDMI 2.0 Active Adapter - 4K UHD @60Hz, 3D Resolutions up to 1920x1080@120Hz, Black (B086B-011B)
+  top4: item_id=99301 score=0.8199 title=StarTech.com USB To Ethernet Adapter - 10/100Mbps Ethernet - USB 2.0 - Black - USB Ethernet Adapter (USB2106S)
+  top5: item_id=349953 score=0.8185 title=Video Capture Card, HDMI to USB 2.0, High Definition 1080p 30fps Record via DSLR Camcorder Compatible with VLC OBS Amcap, for Action Cam Gaming Streaming Teaching Video Live Broadcasting
+
+[aligned_image_feat] item_id=32686 title=20V 3.25A 65W Adapter for Lenovo Thinkpad T400 T410 T420 T420S T430 T430s T430u T500 T510 T520 X120e X130e X131e X140e X200 X201 X220 X220T X230 E520 E530 E535 SL500 SL510 T430u T520 Laptop Charger
+  top1: item_id=367578 score=0.9556 title=Laptop Charger for Dell Inspiron,13 15 17 Series,3000 5000 7000 Series 3147 13 3551 3552 3558 15 5558 5755 5555 17 7348 7472 7352 65W 45W 4.53.0mm tip Universal Ac Power Supply
+  top2: item_id=38338 score=0.9403 title=SiKER 19V 3.42A Laptop Adapter Charger for Acer Chromebook 15 14 13 11 R11 CB3 CB5 CB5-571 C720 C720p C740 Acer Aspire P3 P3-131 R14 R5-471T S7 S7-191 S7-391 S7-392 Iconia W700 Tablet AO1-131/431
+  top3: item_id=512633 score=0.9368 title=90W USB Charger Replacement for Lenovo ThinkPad 11e Chromebook 11e X240 E570 Yoga 11e Chromebook T450s T440p ideapad G51-35 G50-45 G50-80 G70-80 ADLX90NLC3A PA-1900-081 AC Adapter Power Supply Cord
+  top4: item_id=205515 score=0.9351 title=New Np200a5b AD-6019R 60W AC Adapter Laptop Charger for Samsung Np300e5a Np305e5a Np365e5c RV515 RV520 R530 R540 0335A1960 CPA09-004A R580 R480 Q430 CPA09-004 NP270E4E NP270E5E Power Supply Cord
+  top5: item_id=75132 score=0.9346 title=65W Ac Laptop Adapter Charger for HP Pavilion G4 G6 G7 M6 DM4 DV4 DV5 DV6 DV7 G60 G61 G72,2000-2C29WM 2000-2D19WM 2000-329WM 693711-001 677774-001
+
+[aligned_image_feat] item_id=360103 title=LITTLE TREE Bamboo 2-Tier Monitor Stand Riser with 3 Drawers Laptop TV Printer Stand with Multipurpose Compartments
+  top1: item_id=136661 score=0.9000 title=Well Weng Desk Monitor Riser Stand with Storage Organizer 2 Shelves for Computer, iMac, Printer, Laptop
+  top2: item_id=211040 score=0.8764 title=Finnhomy Bamboo Computer Monitor Riser Stand with Portable Compact Cooling Storage Organizer for Rack Bracket Dock Holder Bracket Laptop Cell Phone Desktop Desk Wood Office Home Station
+  top3: item_id=19785 score=0.8720 title=Tribesigns Monitor Stand Riser with Storage Organizer Drawers Bamboo, Natural Brown
+  top4: item_id=112843 score=0.8678 title=WELL WENG Bamboo 2-TIier Monitor Riser with Adjustable Storage Organizer Desktop Stand for iMac,Printer,Notebook,Xbox one,PS4 (MR3-SG)
+  top5: item_id=315767 score=0.8666 title=Uniture Wood Monitor Stand - 2 Shelf 2p - Multi Purpose Stand Made of Natural Pine, Robust Construction, Home and Office Desktop Stand, Desk Organizer With Storage Space, Complete No Assembly Required
+
+[aligned_image_feat] item_id=414399 title=Mini Record Player with Aluminum Base, Phonograph Bluetooth Speaker, Aux-in, USB Port for Flash Drive, Vintage Gramophone Turntable for Home Decoration (Without Record Player)
+  top1: item_id=474409 score=0.8703 title=Idealforce Bluetooth Phonograph Record Player,Portable Version Gramophone Vintage Retro Style Subwoofer Speaker/Aux-in,CD,FM/AM Radio,45 RPM Adapter, for HX-411/12/NF-601/605/610 (Horn with Texture)
+  top2: item_id=600477 score=0.8617 title=Wooden Phonograph Gramophone Turntable Vinyl Record Player Speakers Stereo System Control 33/45 RPM FM AUX USB Ouput Bluetooth 4.2
+  top3: item_id=180794 score=0.8344 title=Mini Vintage Retro Classic Gramophone Phonograph Shape Stereo Speaker Sound System Music Box 3.5mm Audio Blue Tooth 4.2 Aux-in/USB Flash Drive Size: (8.19'' x 6.73'' x 13.11'')
+  top4: item_id=560003 score=0.8262 title=Asommet Gramophone Record Player Retro Turntable All in One Vintage Phonograph Nostalgic for LP with Copper Horn, Built-in Speaker 3.5mm Aux-in/USB/FM Radio Size:13.5in
+  top5: item_id=570571 score=0.8172 title=Pyle PUNPCD65BT Vintage Retro Classic Style Bluetooth Turntable Phonograph Speaker Sound System
+
+[aligned_image_feat] item_id=552100 title=HP Spectre 13-4193dx with Intel i7-6500U 3.1 GHz, 13.3" LED-backlit touch screen (2560 x 1440) 8 GB DDR3L SDRAM (1 x 8 GB) 256 GB SSD Intel 802.11ac (2x2) and Bluetooth 4.0 Combo Windows 10 Home 64
+  top1: item_id=89769 score=1.0000 title=HP Spectre X360 13-4193DX 2-in-1 13.3in QHD Touch Screen Laptop Intel Core i7-6500U 256GB SSD 8GB DDR3L Windows 10 - Black/Gold (Renewed)
+  top2: item_id=47683 score=0.9644 title=HP Spectre x360 - 13t Copper Trim(6th Gen. Intel i7-6500U, QHD 2560x1440, 256GB SSD, 8GB RAM, Windows 10, AC Wifi, Bluetooth, Backlit Keyboard) Ash Silver 2-in-1 13.3" Ultrabook Tablet laptop PC
+  top3: item_id=591397 score=0.9485 title=HP Spectre x360 13-4197ms 2-in-1 13.3in QHD IPS Touch Screen Laptop - Core i7-6500U 8GB Memory 256GB Solid State Drive (Renewed)
+  top4: item_id=447085 score=0.8474 title=Lenovoo Yoga 720 Business 13.3" FHD IPS 2 in 1 Touchscreen Laptop/Tablet, Intel Quad-Core i5-8250U 1.6GHz 8GB DDR4 256GB SSD Backlit Keyboard Dolby Audio Fingerprint Thunderbolt Win 10
+  top5: item_id=193811 score=0.8473 title=PcProfessional Screen Protector (Set of 2) for Lenovo Yoga 710 15 15.6" Touch Screen Laptop Anti Glare Anti Scratch
+
+[SECTION] Raw vs Aligned Neighbor Drift
+[INFO] image_raw_vs_aligned_neighbor_overlap@5: {'mean': 0.36000000000000004, 'min': 0.0, 'max': 0.6}
+
+[SECTION] Final Hints
+1) 如果 raw/aligned 特征大量全零、NaN 或 shape 对不上，先停在特征层排查。
+2) 如果 KNN score 很低、reciprocal ratio 很低、人工看近邻不合理，先改建图。
+3) 如果 07 的 global_mean fallback 用户占比很高，先别信当前验证指标。
+4) 如果上面都正常，但训练效果仍差，再去改 loss、split 和负采样。
+================================================================================
