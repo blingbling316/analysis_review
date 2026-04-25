@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-# ========== 配置 ==========
+# ========== Configuration ==========
 IMAGE_ALIGNED_FILE = '04_image_feat_aligned_item_coldstart.npy'
 TEXT_ALIGNED_FILE = '04_text_feat_aligned_item_coldstart.npy'
 INTERACTION_FILE = '01_elec_5core_interactions.csv'
@@ -16,64 +16,64 @@ OUTPUT_NEIGHBORS = '05_joint_knn_neighbors_item_coldstart.npy'
 OUTPUT_SCORES = '05_joint_knn_scores_item_coldstart.npy'
 OUTPUT_EDGES = '05_joint_knn_edges_item_coldstart.npz'
 
-K_CONTENT = 40          # 内容图每个节点的KNN邻居数（不含自身）
-K_COOC = 20             # 共现图每个节点最多保留多少个邻居
+K_CONTENT = 40          # KNN neighbors per node for content graph (excluding self)
+K_COOC = 20             # Max co-occurrence neighbors per node
 IMAGE_WEIGHT = 0.30
 TEXT_WEIGHT = 0.70
 CHUNK_SIZE = 10000
-GPU_ID = 0              # 使用哪块 GPU
+GPU_ID = 0              # GPU device ID
 
 
-# ========== 1. 加载对齐特征 ==========
-print('加载对齐后的图像特征...')
+# 1. Load Aligned Features
+print('Loading aligned image features...')
 if not os.path.exists(IMAGE_ALIGNED_FILE):
-    raise FileNotFoundError(f'未找到 {IMAGE_ALIGNED_FILE}，请先运行 04。')
+    raise FileNotFoundError(f'File not found: {IMAGE_ALIGNED_FILE}, please run step 04 first.')
 img_feat = np.load(IMAGE_ALIGNED_FILE).astype(np.float32)
 
-print('加载对齐后的文本特征...')
+print('Loading aligned text features...')
 if not os.path.exists(TEXT_ALIGNED_FILE):
-    raise FileNotFoundError(f'未找到 {TEXT_ALIGNED_FILE}，请先运行 04。')
+    raise FileNotFoundError(f'File not found: {TEXT_ALIGNED_FILE}, please run step 04 first.')
 txt_feat = np.load(TEXT_ALIGNED_FILE).astype(np.float32)
 
 if img_feat.shape[0] != txt_feat.shape[0]:
-    raise ValueError(f'图像和文本特征行数不一致: {img_feat.shape[0]} vs {txt_feat.shape[0]}')
+    raise ValueError(f'Image and text feature row count mismatch: {img_feat.shape[0]} vs {txt_feat.shape[0]}')
 
 N = img_feat.shape[0]
-print(f'节点总数: {N}')
-print(f'图像特征维度: {img_feat.shape[1]}, 文本特征维度: {txt_feat.shape[1]}')
+print(f'Total nodes: {N}')
+print(f'Image feature dim: {img_feat.shape[1]}, Text feature dim: {txt_feat.shape[1]}')
 
 
-# ========== 2. 构建内容相似图 ==========
-print('分别归一化图像/文本特征...')
+#2. Build Content Similarity Graph
+print('Normalizing image/text features...')
 faiss.normalize_L2(img_feat)
 faiss.normalize_L2(txt_feat)
 
-print('按权重拼接多模态特征...')
+print('Concatenating multimodal features with weights...')
 joint_feat = np.concatenate([IMAGE_WEIGHT * img_feat, TEXT_WEIGHT * txt_feat], axis=1)
 faiss.normalize_L2(joint_feat)
-print(f'联合特征维度: {joint_feat.shape[1]} | image_weight={IMAGE_WEIGHT}, text_weight={TEXT_WEIGHT}')
+print(f'Joint feature dim: {joint_feat.shape[1]} | image_weight={IMAGE_WEIGHT}, text_weight={TEXT_WEIGHT}')
 
-print('构建 FAISS GPU 内积索引...')
+print('Building FAISS GPU inner product index...')
 dim = joint_feat.shape[1]
 if not hasattr(faiss, 'StandardGpuResources'):
-    raise RuntimeError('当前 faiss 不支持 GPU，请安装 faiss-gpu。')
+    raise RuntimeError('Current FAISS does not support GPU, please install faiss-gpu.')
 
 gpu_num = faiss.get_num_gpus()
 if gpu_num <= 0:
-    raise RuntimeError('未检测到可用 GPU，无法以 GPU 模式运行。')
+    raise RuntimeError('No available GPU detected, cannot run in GPU mode.')
 if GPU_ID < 0 or GPU_ID >= gpu_num:
-    raise ValueError(f'GPU_ID={GPU_ID} 超出可用范围 [0, {gpu_num - 1}]')
+    raise ValueError(f'GPU_ID={GPU_ID} is out of range [0, {gpu_num - 1}]')
 
 cpu_index = faiss.IndexFlatIP(dim)
 res = faiss.StandardGpuResources()
 index = faiss.index_cpu_to_gpu(res, GPU_ID, cpu_index)
 index.add(joint_feat)
-print(f'FAISS 已启用 GPU 检索 | gpu_id={GPU_ID} | 可用GPU数={gpu_num}')
+print(f'FAISS GPU search enabled | gpu_id={GPU_ID} | available GPUs={gpu_num}')
 
-print(f'检索每个节点的 {K_CONTENT + 1} 个最近邻...')
+print(f'Retrieving {K_CONTENT + 1} nearest neighbors for each node...')
 neighbors_list = []
 scores_list = []
-with tqdm(total=N, desc='FAISS 搜索') as pbar:
+with tqdm(total=N, desc='FAISS Search') as pbar:
     for start in range(0, N, CHUNK_SIZE):
         end = min(start + CHUNK_SIZE, N)
         chunk_vecs = joint_feat[start:end]
@@ -87,15 +87,15 @@ scores = np.concatenate(scores_list, axis=0)[:, 1:]
 
 np.save(OUTPUT_NEIGHBORS, neighbors)
 np.save(OUTPUT_SCORES, scores)
-print(f'已保存内容图邻居矩阵: {OUTPUT_NEIGHBORS} {neighbors.shape}')
-print(f'已保存内容图分数矩阵: {OUTPUT_SCORES} {scores.shape}')
+print(f'Saved content graph neighbors: {OUTPUT_NEIGHBORS} {neighbors.shape}')
+print(f'Saved content graph scores: {OUTPUT_SCORES} {scores.shape}')
 
 
-# ========== 3. 构建 item-item 共现图 ==========
+# 3. Build Item-Item Co-occurrence Graph
 def build_cooccurrence_edges(interaction_file: str, num_items: int, topk: int):
-    print('从交互数据构建 item 共现图...')
+    print('Building item co-occurrence graph from interaction data...')
     if not os.path.exists(interaction_file):
-        raise FileNotFoundError(f'未找到 {interaction_file}')
+        raise FileNotFoundError(f'File not found: {interaction_file}')
 
     df = pd.read_csv(interaction_file, usecols=['user_id', 'item_id'])
     df['item_id'] = df['item_id'].astype(int)
@@ -103,7 +103,7 @@ def build_cooccurrence_edges(interaction_file: str, num_items: int, topk: int):
     co_counts = defaultdict(lambda: defaultdict(int))
     user_groups = df.groupby('user_id')['item_id'].apply(list)
 
-    for items in tqdm(user_groups, desc='统计共现'):
+    for items in tqdm(user_groups, desc='Counting Co-occurrences'):
         uniq = sorted(set(int(x) for x in items if 0 <= int(x) < num_items))
         if len(uniq) < 2:
             continue
@@ -113,7 +113,7 @@ def build_cooccurrence_edges(interaction_file: str, num_items: int, topk: int):
 
     rows = []
     cols = []
-    for i in tqdm(range(num_items), desc='截断每个点的共现邻居'):
+    for i in tqdm(range(num_items), desc='Truncating Co-occurrence Neighbors'):
         if i not in co_counts:
             continue
         nbrs = sorted(co_counts[i].items(), key=lambda x: (-x[1], x[0]))[:topk]
@@ -125,11 +125,11 @@ def build_cooccurrence_edges(interaction_file: str, num_items: int, topk: int):
 
 
 co_rows, co_cols = build_cooccurrence_edges(INTERACTION_FILE, N, K_COOC)
-print(f'共现图边数(有向): {len(co_rows):,}')
+print(f'Co-occurrence graph edges (directed): {len(co_rows):,}')
 
 
-# ========== 4. 融合内容图与共现图 ==========
-print('融合内容图与共现图...')
+# 4. Fuse Content and Co-occurrence Graphs
+print('Fusing content graph and co-occurrence graph...')
 content_rows = np.repeat(np.arange(N, dtype=np.int64), neighbors.shape[1])
 content_cols = neighbors.reshape(-1).astype(np.int64)
 
@@ -140,7 +140,7 @@ valid = (all_rows >= 0) & (all_rows < N) & (all_cols >= 0) & (all_cols < N) & (a
 all_rows = all_rows[valid]
 all_cols = all_cols[valid]
 
-# 对称化 + 去重
+# Symmetrize + Deduplicate
 rows_sym = np.concatenate([all_rows, all_cols])
 cols_sym = np.concatenate([all_cols, all_rows])
 edge_pairs = np.stack([rows_sym, cols_sym], axis=1)
@@ -150,10 +150,9 @@ cols_sym = edge_pairs[:, 1]
 
 np.savez(OUTPUT_EDGES, row=rows_sym, col=cols_sym)
 
-print('=' * 60)
-print('融合图构建完成')
-print(f'内容图 K: {K_CONTENT}')
-print(f'共现图 topK: {K_COOC}')
-print(f'最终边文件: {OUTPUT_EDGES}')
-print(f'最终边数(有向, 去重+对称化后): {len(rows_sym):,}')
-print('=' * 60)
+
+print('Fused graph construction completed')
+print(f'Content graph K: {K_CONTENT}')
+print(f'Co-occurrence graph topK: {K_COOC}')
+print(f'Final edge file: {OUTPUT_EDGES}')
+print(f'Final edge count (directed, deduplicated + symmetrized): {len(rows_sym):,}')

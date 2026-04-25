@@ -16,38 +16,32 @@ from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 
 
-# ============================================================
-# step3: 融合图 + 残差式图增强
-# 1) 图结构 = 内容KNN图 + 行为共现图
-# 2) 仍然使用 minibatch 子图训练
-# 3) 使用 hard negative
-# 4) item 表征 = alpha * content_proj + (1-alpha) * gnn_emb
-# ============================================================
-
+# step3: Fusion Graph + Residual Graph Enhancement
+# 1) Graph structure = Content-based KNN graph + Behavior co-occurrence graph
+# 2) Mini-batch subgraph training is still used
+# 3) Hard negative sampling is applied
+# 4) Item representation = alpha * content_proj + (1-alpha) * gnn_emb
 
 @dataclass
 class Config:
-    # ---------- 输入 ----------
+
     img_feat_path: str = '04_image_feat_aligned_item_coldstart.npy'
     txt_feat_path: str = '04_text_feat_aligned_item_coldstart.npy'
     edge_path: str = '05_joint_knn_edges_item_coldstart.npz'
     interaction_path: str = '01_elec_5core_interactions.csv'
 
-    # ---------- 与 04 对齐的 split ----------
     split_path: str = '04_item_cold_split.npz'
     reuse_existing_split: bool = True
     random_seed: int = 42
     val_item_ratio: float = 0.10
     test_item_ratio: float = 0.10
 
-    # ---------- 模型 ----------
     in_dim: int = 512
     hidden_dim: int = 256
-    out_dim: int = 512   # 为了做 residual fusion，保持和内容特征同维度
+    out_dim: int = 512
     dropout: float = 0.1
     residual_alpha: float = 0.7
 
-    # ---------- 训练 ----------
     epochs: int = 5
     batch_size: int = 128
     steps_per_epoch: int = 300
@@ -56,20 +50,17 @@ class Config:
     use_amp: bool = True
     hard_negative_ratio: float = 0.30
 
-    # ---------- 子图采样 ----------
     fanouts: Tuple[int, int] = (15, 10)
     max_history: int = 20
 
-    # ---------- 评估 ----------
+
     eval_top_k: Tuple[int, ...] = (10, 20, 50)
     eval_negatives: int = 99
     eval_max_users: int = 500
 
-    # ---------- 输出 ----------
     save_dir: str = 'outputs_item_coldstart_step3_residual'
     best_model_name: str = 'best_model_item_coldstart_step3_residual.pth'
 
-    # ---------- 设备 ----------
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -90,9 +81,7 @@ set_seed(cfg.random_seed)
 _rng = np.random.default_rng(cfg.random_seed)
 
 
-# ============================================================
-# 图工具：CSR
-# ============================================================
+# CSR
 def build_csr(num_nodes: int, row: np.ndarray, col: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     order = np.argsort(row, kind='mergesort')
     row = row[order]
@@ -152,9 +141,7 @@ def build_sampled_subgraph(seed_nodes: np.ndarray, indptr: np.ndarray, indices: 
     return all_nodes, edge_index, local_id
 
 
-# ============================================================
-# 数据
-# ============================================================
+
 def load_features() -> np.ndarray:
     print('[INFO] Loading aligned features...')
     print(f'[INFO] image feature file: {cfg.img_feat_path}')
@@ -163,7 +150,7 @@ def load_features() -> np.ndarray:
     img_feat = np.load(cfg.img_feat_path).astype(np.float32)
     txt_feat = np.load(cfg.txt_feat_path).astype(np.float32)
     if img_feat.shape[0] != txt_feat.shape[0]:
-        raise ValueError(f'图像/文本特征行数不一致: {img_feat.shape[0]} vs {txt_feat.shape[0]}')
+        raise ValueError(f"Image / text feature row count mismatch: {img_feat.shape[0]} vs {txt_feat.shape[0]}")
 
     x_np = np.concatenate([img_feat, txt_feat], axis=1).astype(np.float32)
     print(f'[INFO] Feature matrix: {x_np.shape}')
@@ -174,7 +161,7 @@ def load_graph(num_nodes: int):
     print('[INFO] Loading graph...')
     data = np.load(cfg.edge_path)
     if not {'row', 'col'}.issubset(set(data.files)):
-        raise ValueError(f'边文件必须包含 row/col，实际: {data.files}')
+        raise ValueError(f"Edge file must contain 'row' and 'col' fields, found: {data.files}")
 
     row = data['row'].astype(np.int64)
     col = data['col'].astype(np.int64)
@@ -201,7 +188,7 @@ def create_item_split(num_items: int):
     n_test = int(num_items * cfg.test_item_ratio)
     n_train = num_items - n_val - n_test
     if n_train <= 0:
-        raise ValueError('训练 item 数必须大于 0')
+        raise ValueError('The number of training items must be greater than 0')
 
     train_items = np.sort(item_ids[:n_train])
     val_items = np.sort(item_ids[n_train:n_train + n_val])
@@ -221,13 +208,13 @@ def load_or_create_split(num_items: int):
         data = np.load(cfg.split_path)
         required = {'train_mask', 'val_mask', 'test_mask'}
         if not required.issubset(set(data.files)):
-            raise ValueError(f'split 文件缺字段，实际字段: {data.files}')
+            raise ValueError(f"Split file missing required fields, found fields: {data.files}")
 
         train_mask = data['train_mask'].astype(bool)
         val_mask = data['val_mask'].astype(bool)
         test_mask = data['test_mask'].astype(bool)
         if len(train_mask) != num_items:
-            raise ValueError(f'split 长度和特征行数不一致: split={len(train_mask)}, num_items={num_items}')
+            raise ValueError(f"Split length does not match feature rows: split={len(train_mask)}, num_items={num_items}")
         print(f'[INFO] Loaded split from: {cfg.split_path}')
     else:
         train_mask, val_mask, test_mask = create_item_split(num_items)
@@ -284,9 +271,6 @@ def prepare_data(num_items: int):
     }
 
 
-# ============================================================
-# 模型
-# ============================================================
 class GraphSAGE(nn.Module):
     def __init__(self, in_dim: int, hidden_dim: int, out_dim: int, dropout: float = 0.1):
         super().__init__()
@@ -302,9 +286,6 @@ class GraphSAGE(nn.Module):
         return F.normalize(h, p=2, dim=1)
 
 
-# ============================================================
-# 训练 batch
-# ============================================================
 def clip_history(hist: List[int], max_len: int) -> List[int]:
     if len(hist) <= max_len:
         return hist
@@ -393,10 +374,8 @@ def bpr_loss(user_emb: torch.Tensor, pos_emb: torch.Tensor, neg_emb: torch.Tenso
     neg_score = (user_emb * neg_emb).sum(dim=1)
     return -F.logsigmoid(pos_score - neg_score).mean()
 
+# Evaluation: Per-user Subgraph
 
-# ============================================================
-# 评估：逐用户子图
-# ============================================================
 @torch.no_grad()
 def evaluate(model: nn.Module, x_np: np.ndarray, indptr: np.ndarray, indices: np.ndarray, support_user_items: Dict[int, List[int]], target_user_items: Dict[int, List[int]], valid_users: List[int], candidate_mask: np.ndarray):
     if not valid_users:
@@ -454,14 +433,13 @@ def evaluate(model: nn.Module, x_np: np.ndarray, indptr: np.ndarray, indices: np
     return float(auc), dict(recalls)
 
 
-# ============================================================
-# 主流程
-# ============================================================
+# main
+
 def main():
     x_np = load_features()
     num_items = x_np.shape[0]
     if x_np.shape[1] != cfg.in_dim:
-        raise ValueError(f'in_dim 与特征维度不一致: cfg.in_dim={cfg.in_dim}, feature_dim={x_np.shape[1]}')
+        raise ValueError(f"in_dim does not match feature dimension: cfg.in_dim={cfg.in_dim}, feature_dim={x_np.shape[1]}")
     indptr, indices = load_graph(num_items)
     data = prepare_data(num_items)
 

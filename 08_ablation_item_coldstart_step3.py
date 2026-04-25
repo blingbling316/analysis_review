@@ -16,14 +16,10 @@ from torch_geometric.nn import SAGEConv
 from tqdm import tqdm
 from collections import defaultdict
 
-# ============================================================
-# 统一对照实验脚本（step3 同步版）
-# 支持：
-# 1) aligned + GNN(residual)
-# 2) raw + GNN(residual)
-# 3) aligned + noGNN
-# 4) raw + noGNN
-# ============================================================
+# 1) aligned + GNN (residual)
+# 2) raw + GNN (residual)
+# 3) aligned + no GNN
+# 4) raw + no GNN
 
 
 @dataclass
@@ -210,7 +206,7 @@ def load_graph(num_nodes: int, logger: TxtLogger):
     logger.log("[INFO] Loading graph...")
     data = np.load(cfg.edge_path)
     if not {"row", "col"}.issubset(set(data.files)):
-        raise ValueError(f"边文件必须包含 row/col，实际: {data.files}")
+        raise ValueError(f"Edge file must contain row/col, actual: {data.files}")
 
     row = data["row"].astype(np.int64)
     col = data["col"].astype(np.int64)
@@ -791,7 +787,7 @@ def main():
 
     for exp_name in cfg.experiments:
         if exp_name not in exp_map:
-            raise ValueError(f"未知实验名: {exp_name}")
+            raise ValueError(f"unknown: {exp_name}")
         feature_kind, use_gnn = exp_map[exp_name]
         result = run_experiment(exp_name, feature_kind, use_gnn, shared_data)
         results.append(result)

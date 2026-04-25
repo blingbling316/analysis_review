@@ -10,7 +10,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 import os
 
-SAVE_INTERVAL = 50000  # 每 5 万个物品保存一次，防止白跑
+SAVE_INTERVAL = 50000
 OUTPUT_FILE = 'image_feat.npy'
 TEMP_DIR = 'image_checkpoints'
 BATCH_SIZE = 64
@@ -18,7 +18,6 @@ NUM_WORKERS = 8
 
 preprocess = transforms.Compose([
     transforms.Resize((256,256)),
-    # transforms.CenterCrop(224), # 我们图片是完整的，这里是否还有需要你裁减，有待商议
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
@@ -54,14 +53,13 @@ class ImageFeatureDataset(Dataset):
             response = requests.get(url, timeout=10)
             img = Image.open(BytesIO(response.content)).convert('RGB')
             img_t = self.preprocess(img)
-            return idx, img_t  # 返回预处理后的tensor，不在这里转GPU
+            return idx, img_t
         except:
             return idx, torch.zeros(3, 256, 256, dtype=torch.float32)
 
 
 def run_full_extraction():
-    # 读取并排序
-    print("正在加载元数据...")
+    print("Loading metadata...")
     items = []
     with open('01_elec_5core_meta.jsonl', 'r', encoding='utf-8') as f:
         for line in f:
@@ -77,28 +75,23 @@ def run_full_extraction():
         pin_memory=True,
         shuffle=False
     )
-    # 初始化最终的大矩阵
+
     final_features = np.zeros((n_items, 2048), dtype=np.float32)
-    print("开始提取特征...")
+    print("Extracting features...")
     with torch.no_grad():
-        for batch_idx, (indices, batch_tensors) in enumerate(tqdm(dataloader, desc="提取特征")):
-            # indices: 当前batch的原始索引列表
-            # batch_tensors: 预处理后的图像tensor [batch_size, 3, 256, 256]
+        for batch_idx, (indices, batch_tensors) in enumerate(tqdm(dataloader, desc="Extracting Features")):
+
             valid_mask = batch_tensors.sum(dim=(1, 2, 3)) != 0
             if valid_mask.any():
-                # 将有效的tensor移到GPU
                 valid_tensors = batch_tensors[valid_mask].to(device)
-                # GPU推理
                 features = model(valid_tensors).cpu().numpy().reshape(-1, 2048)
-                # 填充特征到对应位置
                 valid_indices = [indices[i] for i in range(len(indices)) if valid_mask[i]]
                 for idx, feat in zip(valid_indices, features):
                     final_features[idx] = feat.astype(np.float32)
 
-    # 最终保存
-    print(f"\n正在保存最终文件 {OUTPUT_FILE}...")
+    print(f"\nSaving final file {OUTPUT_FILE}...")
     np.save(OUTPUT_FILE, final_features)
-    print("✅ 全量图像特征提取完成！")
+    print("Full image feature extraction completed!")
 
 if __name__ == "__main__":
     run_full_extraction()

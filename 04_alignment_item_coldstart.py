@@ -13,23 +13,20 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 
-# ============================================================
-# 目标：把 04 改成真正适配“新商品冷启动”的版本
-# 1) 按 item 划分 train / val / test，而不是按 user 划分
-# 2) 只在 warm(train) items 上训练图文对齐
-# 3) 用 val-cold items 做图文检索验证
-# 4) 导出全量 aligned 特征，并把 split 落盘给 07 复用
-# ============================================================
+# 1) Split train / val / test by item
+# 2) Train cross-modal alignment only on warm (train) items
+# 3) Evaluate text-image retrieval on val-cold items
+# 4) Export full aligned features and save split for reuse in step 07
 
 
 @dataclass
 class Config:
-    # ---------- 输入 ----------
+    # ---------- input ----------
     image_feat_file: str = "03_image_feat.npy"
     text_feat_file: str = "02_text_feat.npy"
     interactions_file: str = "01_elec_5core_interactions.csv"
 
-    # ---------- 输出 ----------
+    # ---------- output ----------
     save_model_path: str = "04_cross_modal_alignment_item_coldstart.pt"
     output_image_feat: str = "04_image_feat_aligned_item_coldstart.npy"
     output_text_feat: str = "04_text_feat_aligned_item_coldstart.npy"
@@ -42,7 +39,6 @@ class Config:
     test_item_ratio: float = 0.10
     reuse_existing_split: bool = True
 
-    # ---------- 训练 ----------
     embed_dim: int = 256
     hidden_dim: int = 512
     batch_size: int = 512
@@ -51,7 +47,7 @@ class Config:
     temperature: float = 0.07
     weight_decay: float = 1e-5
 
-    # ---------- 验证 ----------
+    # ---------- val ----------
     eval_batch_size: int = 2048
     eval_top_k: Tuple[int, ...] = (1, 5, 10)
     val_eval_max_items: int = 50000
@@ -75,9 +71,6 @@ def set_seed(seed: int) -> None:
 set_seed(cfg.random_seed)
 
 
-# ============================================================
-# split 工具
-# ============================================================
 def create_item_split(num_items: int, val_ratio: float, test_ratio: float, seed: int):
     item_ids = np.arange(num_items)
     rng = np.random.default_rng(seed)
@@ -87,7 +80,7 @@ def create_item_split(num_items: int, val_ratio: float, test_ratio: float, seed:
     n_test = int(num_items * test_ratio)
     n_train = num_items - n_val - n_test
     if n_train <= 0:
-        raise ValueError("训练 item 数必须大于 0")
+        raise ValueError("Training item count must be greater than 0")
 
     train_items = np.sort(item_ids[:n_train])
     val_items = np.sort(item_ids[n_train:n_train + n_val])
@@ -120,12 +113,12 @@ def load_or_create_split(num_items: int):
         data = np.load(cfg.split_file)
         required = {"train_mask", "val_mask", "test_mask"}
         if not required.issubset(set(data.files)):
-            raise ValueError(f"split 文件缺少字段: {required - set(data.files)}")
+            raise ValueError(f"Split file missing required fields: {required - set(data.files)}")
         train_mask = data["train_mask"].astype(bool)
         val_mask = data["val_mask"].astype(bool)
         test_mask = data["test_mask"].astype(bool)
         if len(train_mask) != num_items or len(val_mask) != num_items or len(test_mask) != num_items:
-            raise ValueError("已有 split 文件长度和当前特征矩阵行数不一致")
+            raise ValueError("Split file length does not match feature matrix row count")
         print(f"Loaded existing split from: {cfg.split_file}")
         return train_mask, val_mask, test_mask
 
@@ -140,9 +133,6 @@ def load_or_create_split(num_items: int):
     return train_mask, val_mask, test_mask
 
 
-# ============================================================
-# 数据集
-# ============================================================
 class AlignDataset(Dataset):
     def __init__(self, img_feat: np.ndarray, txt_feat: np.ndarray, item_mask: np.ndarray):
         self.item_ids = np.where(item_mask)[0].astype(np.int64)
@@ -156,9 +146,6 @@ class AlignDataset(Dataset):
         return self.img_feat[idx], self.txt_feat[idx], int(self.item_ids[idx])
 
 
-# ============================================================
-# 模型
-# ============================================================
 class ProjectionHead(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
         super().__init__()
@@ -181,9 +168,7 @@ def info_nce_loss(img_emb: torch.Tensor, txt_emb: torch.Tensor, temperature: flo
     return (loss_img + loss_txt) / 2
 
 
-# ============================================================
-# 验证：在 val-cold items 上看图文检索 Recall@K
-# ============================================================
+# Evaluation: Text-image retrieval Recall@K on val-cold items
 @torch.no_grad()
 def encode_full(
     model_img: nn.Module,
@@ -231,7 +216,7 @@ def retrieval_recall_at_k(img_emb: np.ndarray, txt_emb: np.ndarray, item_mask: n
             scores = query[start:end] @ cand.T  # (chunk, n)
             local_targets = np.arange(start, end)
 
-            # 只取 top-k，不做全量 argsort，避免巨大内存占用
+            # Use partial argpartition to avoid full sorting and high memory usage
             top_idx_unsorted = np.argpartition(-scores, kth=max_k - 1, axis=1)[:, :max_k]
             top_scores = np.take_along_axis(scores, top_idx_unsorted, axis=1)
             order = np.argsort(-top_scores, axis=1)
@@ -251,19 +236,19 @@ def retrieval_recall_at_k(img_emb: np.ndarray, txt_emb: np.ndarray, item_mask: n
 
 
 # ============================================================
-# 主流程
+# Main Pipeline
 # ============================================================
 def main():
     print("Loading raw features...")
     img_feat = np.load(cfg.image_feat_file).astype(np.float32)
     txt_feat = np.load(cfg.text_feat_file).astype(np.float32)
     if img_feat.shape[0] != txt_feat.shape[0]:
-        raise ValueError(f"图像/文本特征行数不一致: {img_feat.shape[0]} vs {txt_feat.shape[0]}")
+        raise ValueError(f"Image / text feature row count mismatch: {img_feat.shape[0]} vs {txt_feat.shape[0]}")
 
     num_items = img_feat.shape[0]
     print(f"Total items: {num_items:,}")
 
-    # interactions 只用于打印 split 后 warm/cold 覆盖情况，不参与 item split 本身
+    # Interactions are only used for split statistics, not for item splitting
     print("Loading interactions for statistics...")
     interactions = pd.read_csv(cfg.interactions_file)
     print(f"Total interactions: {len(interactions):,}")
@@ -343,7 +328,7 @@ def main():
             chunk_size=cfg.eval_chunk_size,
         )
 
-        # 用 val 上的平均 Recall@10 作为 early stopping 基准
+        # Use average Recall@10 on val set for early stopping
         score = (val_metrics.get("i2t_r@10", 0.0) + val_metrics.get("t2i_r@10", 0.0)) / 2.0
         history_row = {"epoch": epoch, "loss": avg_loss, **val_metrics}
         history.append(history_row)
@@ -372,7 +357,7 @@ def main():
     history_df.to_csv(history_path, index=False)
     print(f"Training history saved to: {history_path}")
 
-    # 载入最佳模型并导出全量 aligned 特征
+    # Load best model and export full aligned features
     print("\nLoading best checkpoint and exporting aligned features...")
     checkpoint = torch.load(cfg.save_model_path, map_location="cpu")
     model_img.load_state_dict(checkpoint["model_img"])
@@ -394,7 +379,7 @@ def main():
     print(f"Saved aligned image features: {cfg.output_image_feat} shape {aligned_img.shape}")
     print(f"Saved aligned text features:  {cfg.output_text_feat} shape {aligned_txt.shape}")
 
-    # 补一个最终的 val/test retrieval 指标，方便核对 04 本身是否稳定
+    # Final val/test retrieval metrics for verification
     val_metrics = retrieval_recall_at_k(aligned_img, aligned_txt, val_mask, cfg.eval_top_k, cfg.val_eval_max_items, cfg.eval_chunk_size)
     test_metrics = retrieval_recall_at_k(aligned_img, aligned_txt, test_mask, cfg.eval_top_k, cfg.val_eval_max_items, cfg.eval_chunk_size)
 
@@ -407,7 +392,7 @@ def main():
         print(f"i2t R@{k}: {test_metrics[f'i2t_r@{k}']:.4f} | t2i R@{k}: {test_metrics[f't2i_r@{k}']:.4f}")
 
     print("\nDone.")
-    print(f"Important: 后续 07 请复用同一份 split 文件: {cfg.split_file}")
+    print(f"Important: Reuse this split file for step 07: {cfg.split_file}")
 
 
 if __name__ == "__main__":
